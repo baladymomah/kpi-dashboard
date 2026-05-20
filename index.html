@@ -489,14 +489,14 @@ function updateDropdownBtn() {
     if (btnText)  btnText.textContent  = labels[0];
     if (btnCount) btnCount.textContent = '1';
     if (badge)    badge.textContent    = labels[0];
-    if (h1)    h1.textContent    = '4 Key Performance Indicators · ' + (MONTHS[selectedMonths[0]] ? MONTHS[selectedMonths[0]].title : '');
+    if (h1)    h1.textContent    = 'Key Performance Indicators · ' + (MONTHS[selectedMonths[0]] ? MONTHS[selectedMonths[0]].title : '');
     if (panel) panel.textContent = 'Overall Status — ' + (MONTHS[selectedMonths[0]] ? MONTHS[selectedMonths[0]].title : '');
   } else {
     var short = labels.map(function(l){ return l.split(' ')[0]; }).join(', ');
     if (btnText)  btnText.textContent  = short;
     if (btnCount) btnCount.textContent = String(selectedMonths.length);
     if (badge)    badge.textContent    = labels.join(' + ');
-    if (h1)    h1.textContent    = '4 Key Performance Indicators · Combined (' + selectedMonths.length + ' months)';
+    if (h1)    h1.textContent    = 'Key Performance Indicators · Combined (' + selectedMonths.length + ' months)';
     if (panel) panel.textContent = 'Overall Status — Combined (' + selectedMonths.length + ' months)';
   }
 }
