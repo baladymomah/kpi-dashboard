@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KPI Dashboard – May 2026</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; padding: 20px; color: #1a1a1a; }
+  .dashboard { max-width: 1140px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 28px 28px 20px; box-shadow: 0 2px 16px rgba(0,0,0,0.09); }
+  .header { border-left: 4px solid #0F6E56; padding-left: 14px; margin-bottom: 18px; }
+  .header .kpi-tag { font-size: 10px; font-weight: 700; color: #0F6E56; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 4px; }
+  .header h1 { font-size: 24px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .header .source-line { font-size: 12px; color: #777; }
+  hr.divider { border: none; border-top: 1px solid #e4e8ec; margin: 0 0 16px; }
+  .loading-bar { display: flex; align-items: center; gap: 10px; background: #E3F2FD; border: 1px solid #90CAF9; border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #0D47A1; margin-bottom: 14px; }
+  .spinner { width: 18px; height: 18px; border: 3px solid #90CAF9; border-top-color: #1565C0; border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-bar { display: none; align-items: center; gap: 10px; background: #FFEBEE; border: 1px solid #EF9A9A; border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #C62828; margin-bottom: 14px; }
+  .kpi-grid, .info-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 10px; }
+  .kpi-card { border: 1px solid #e4e8ec; border-radius: 8px; padding: 14px 14px 12px; background: #fff; transition: box-shadow .2s; }
+  .kpi-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+  .kpi-card.on-target    { border-top: 3px solid #0F6E56; }
+  .kpi-card.needs-action { border-top: 3px solid #E07B00; }
+  .kpi-card.critical     { border-top: 3px solid #C0392B; }
+  .kpi-card.neutral      { border-top: 3px solid #b0bec5; }
+  .card-label { font-size: 10.5px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+  .card-value { font-size: 28px; font-weight: 700; line-height: 1.1; margin-bottom: 8px; min-height: 34px; }
+  .card-value.green  { color: #0F6E56; }
+  .card-value.red    { color: #C0392B; }
+  .card-value.orange { color: #E07B00; }
+  .card-value.dark   { color: #1a1a1a; }
+  .card-value.big-red { color: #C0392B; font-size: 36px; }
+  .card-meta { font-size: 11.5px; line-height: 1.65; }
+  .tag-green  { color: #0F6E56; font-weight: 600; }
+  .tag-red    { color: #C0392B; font-weight: 600; }
+  .tag-orange { color: #E07B00; font-weight: 600; }
+  .tag-gray   { color: #999; }
+  .card-subtitle { font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 2px; }
+  .card-count    { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+  .status-panel { background: #f7f8fa; border: 1px solid #e4e8ec; border-radius: 8px; padding: 16px 18px; margin-bottom: 10px; }
+  .panel-title { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 14px; }
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 170px; gap: 10px; }
+  .stat-box { border-radius: 8px; padding: 16px 12px; text-align: center; }
+  .stat-box.green-bg  { background: #EAF3DE; }
+  .stat-box.orange-bg { background: #FFF3E0; }
+  .stat-box.red-bg    { background: #FCEBEB; }
+  .stat-box.dark-bg   { background: #1A2B2E; }
+  .stat-num { font-size: 38px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+  .stat-num.green  { color: #0F6E56; }
+  .stat-num.orange { color: #E07B00; }
+  .stat-num.red    { color: #C0392B; }
+  .stat-num.white  { color: #fff; font-size: 28px; }
+  .stat-desc       { font-size: 12px; color: #777; }
+  .stat-desc.white { color: rgba(255,255,255,.75); }
+  .ticker { background: #1A2B2E; border-radius: 8px; padding: 11px 16px; margin-bottom: 10px; }
+  .ticker p { color: #fff; font-size: 12px; line-height: 1.7; }
+  .ticker p.bold { font-weight: 700; font-size: 13px; }
+  .skel { display: inline-block; background: #e8ecf0; border-radius: 4px; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .last-updated { text-align: left; font-size: 11px; color: #aaa; margin-top: 8px; padding-top: 6px; }
+
+  /* Formula Section */
+  .formula-panel { background: #f7f8fa; border: 1px solid #e4e8ec; border-radius: 8px; padding: 16px 18px; margin-bottom: 10px; }
+  .formula-panel-title { font-size: 13px; font-weight: 700; color: #1A2B2E; margin-bottom: 14px; }
+  .formula-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 14px; }
+  .f-card { background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 12px; text-align: center; }
+  .f-card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #888; margin-bottom: 8px; letter-spacing:.04em; }
+  .f-eq { font-size: 13px; color: #333; margin-bottom: 6px; }
+  .f-num { font-size: 15px; font-weight: 700; color: #1565C0; }
+  .f-den { font-size: 13px; color: #555; border-top: 1.5px solid #555; margin-top: 2px; padding-top: 2px; }
+  .f-result { font-size: 13px; font-weight: 700; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e0e0e0; }
+
+  /* Score Detail Table */
+  .score-detail-panel { background: #f7f8fa; border: 1px solid #e4e8ec; border-radius: 8px; padding: 16px 18px; margin-bottom: 10px; }
+  .score-detail-title { font-size: 13px; font-weight: 700; color: #1A2B2E; margin-bottom: 14px; }
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .detail-table th { background: #1A2B2E; color: #fff; padding: 10px 12px; font-weight: 600; text-align: center; }
+  .detail-table th:first-child { text-align: left; border-radius: 6px 0 0 0; }
+  .detail-table th:last-child { border-radius: 0 6px 0 0; }
+  .detail-table td { padding: 10px 12px; border-bottom: 1px solid #e8ecf0; text-align: center; vertical-align: middle; }
+  .detail-table td:first-child { text-align: left; font-weight: 600; }
+  .detail-table tr.total-row td { background: #EAF3DE; font-weight: 700; border-bottom: none; }
+  .detail-table tr:hover td { background: #f5f7fa; }
+  .detail-table tr.total-row:hover td { background: #d4edda; }
+  .badge-ok  { background: #E8F5E9; color: #0F6E56; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+  .badge-warn{ background: #FFF3E0; color: #E07B00; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+  .badge-red { background: #FFEBEE; color: #C0392B; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+  .w-badge { background: #E3F2FD; color: #1565C0; border-radius: 4px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+
+
+  .charts-section { margin-bottom: 10px; }
+  .charts-title { font-size: 13px; font-weight: 700; color: #1A2B2E; margin-bottom: 12px; }
+  .charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .chart-card { background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 14px; }
+  .chart-card-title { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; text-align: center; }
+  .chart-loading { text-align: center; color: #aaa; font-size: 12px; padding: 40px 0; }
+
+
+  .month-selector { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; position:relative; }
+  .month-label { font-size:13px; font-weight:600; color:#1A2B2E; }
+  .month-dropdown-wrap { position:relative; }
+  .month-dropdown-btn {
+    display:flex; align-items:center; gap:8px;
+    background:#fff; border:1.5px solid #0F6E56; border-radius:8px;
+    padding:8px 14px; font-size:13px; font-weight:600; color:#1A2B2E;
+    cursor:pointer; min-width:200px; user-select:none;
+    transition: box-shadow .2s;
+  }
+  .month-dropdown-btn:hover { box-shadow:0 0 0 3px rgba(15,110,86,0.12); }
+  .month-dropdown-btn .btn-text { flex:1; }
+  .month-dropdown-btn .btn-count {
+    background:#0F6E56; color:#fff; border-radius:10px;
+    padding:1px 7px; font-size:11px; font-weight:700; min-width:18px; text-align:center;
+  }
+  .month-dropdown-btn .btn-arrow { color:#0F6E56; font-size:11px; transition:transform .2s; }
+  .month-dropdown-btn.open .btn-arrow { transform:rotate(180deg); }
+  .month-dropdown-list {
+    display:none; position:absolute; top:calc(100% + 6px); left:0;
+    background:#fff; border:1.5px solid #e4e8ec; border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.12); z-index:999; min-width:220px;
+    overflow:hidden;
+  }
+  .month-dropdown-list.open { display:block; }
+  .month-dropdown-item {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 16px; cursor:pointer; font-size:13px; color:#1A2B2E;
+    transition:background .15s; border-bottom:1px solid #f0f0f0;
+  }
+  .month-dropdown-item:last-child { border-bottom:none; }
+  .month-dropdown-item:hover { background:#f5f9f7; }
+  .month-dropdown-item.selected { background:#EAF3DE; }
+  .month-dropdown-item input[type=checkbox] { width:15px; height:15px; accent-color:#0F6E56; cursor:pointer; flex-shrink:0; }
+  .month-dropdown-item .item-label { flex:1; font-weight:500; }
+  .month-dropdown-item .item-check { color:#0F6E56; font-size:14px; font-weight:700; }
+  .month-badge { background:#E8F5E9; color:#0F6E56; border-radius:6px; padding:5px 12px; font-size:11px; font-weight:700; }
+
+  .charts-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 10px; }
+  .chart-card-pie { background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; align-items: center; }
+  .chart-card-pie .chart-card-title { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; text-align: center; width: 100%; }
+
+  @media (max-width: 860px) {
+    .kpi-grid, .info-grid { grid-template-columns: repeat(2,1fr); }
+    .status-grid { grid-template-columns: 1fr 1fr; }
+    .formula-grid { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="dashboard">
+
+  <div class="header">
+    <p class="kpi-tag">KPI Overview</p>
+    <h1>Key Performance Indicators &middot; May 2026</h1>
+    <p class="source-line" id="sourceLine">Source: TFS &mdash; Loading data…</p>
+  </div>
+  <hr class="divider"/>
+
+  <div class="month-selector">
+    <span class="month-label">&#128197; Select Period:</span>
+    <div class="month-dropdown-wrap">
+      <div class="month-dropdown-btn" id="monthDropdownBtn" onclick="toggleDropdown()">
+        <span class="btn-text" id="monthBtnText">May 2026</span>
+        <span class="btn-count" id="monthBtnCount">1</span>
+        <span class="btn-arrow">&#9660;</span>
+      </div>
+      <div class="month-dropdown-list" id="monthDropdownList">
+        <div class="month-dropdown-item selected" id="item-mar2026" onclick="toggleMonthItem('mar2026', event)">
+          <input type="checkbox" id="chk-mar2026">
+          <span class="item-label">March 2026</span>
+        </div>
+        <div class="month-dropdown-item selected" id="item-apr2026" onclick="toggleMonthItem('apr2026', event)">
+          <input type="checkbox" id="chk-apr2026">
+          <span class="item-label">April 2026</span>
+        </div>
+        <div class="month-dropdown-item selected" id="item-may2026" onclick="toggleMonthItem('may2026', event)">
+          <input type="checkbox" id="chk-may2026" checked>
+          <span class="item-label">May 2026 (Current)</span>
+        </div>
+      </div>
+    </div>
+    <span class="month-badge" id="monthBadge">May 2026</span>
+  </div>
+
+  <div class="loading-bar" id="loadingBar"><div class="spinner"></div><span>Fetching data from TFS…</span></div>
+  <div class="error-bar" id="errorBar">⚠️ &nbsp;<span id="errorMsg">Failed to connect to TFS</span></div>
+
+  <!-- Row 1 -->
+  <div class="kpi-grid">
+    <div class="kpi-card" id="card-defect"><p class="card-label">Defect Leakage</p><p class="card-value green" id="val-defect"><span class="skel" style="width:70px;height:28px;">&nbsp;</span></p><p class="card-meta" id="meta-defect"></p></div>
+    <div class="kpi-card" id="card-reopen"><p class="card-label">Reopen Rate</p><p class="card-value orange" id="val-reopen"><span class="skel" style="width:70px;height:28px;">&nbsp;</span></p><p class="card-meta" id="meta-reopen"></p></div>
+    <div class="kpi-card" id="card-rejected"><p class="card-label">Rejected Bug Rate</p><p class="card-value green" id="val-rejected"><span class="skel" style="width:70px;height:28px;">&nbsp;</span></p><p class="card-meta" id="meta-rejected"></p></div>
+    <div class="kpi-card" id="card-critical"><p class="card-label">Critical/High Bug Rate</p><p class="card-value red" id="val-critical"><span class="skel" style="width:80px;height:28px;">&nbsp;</span></p><p class="card-meta" id="meta-critical"></p></div>
+    <div class="kpi-card neutral"><p class="card-label">Quality Score</p><p class="card-value dark" id="val-quality"><span class="skel" style="width:80px;height:28px;">&nbsp;</span></p><p class="card-meta" id="meta-quality"></p></div>
+  </div>
+
+  <!-- Row 2 -->
+  <div class="info-grid">
+    <div class="kpi-card neutral"><p class="card-label">Total Bugs</p><p class="card-value dark" id="val-total"><span class="skel" style="width:60px;height:28px;">&nbsp;</span></p><p class="card-meta" id="meta-total"></p></div>
+    <div class="kpi-card needs-action"><p class="card-label">Test Cases</p><p class="card-value dark" id="val-tc"><span class="skel" style="width:60px;height:28px;">&nbsp;</span></p><p class="card-meta"><span class="tag-orange">TFS Executed</span></p></div>
+    <div class="kpi-card needs-action"><p class="card-label">Change Requests</p><p class="card-subtitle">Change Requests</p><p class="card-count" id="val-cr"><span class="skel" style="width:40px;height:22px;">&nbsp;</span></p><p class="card-meta"><span class="tag-green">Sprint 05-2026</span></p></div>
+    <div class="kpi-card critical"><p class="card-label">Technical Production Bugs</p>
+        <p class="card-value big-red" id="val-prod"><span class="skel" style="width:50px;height:34px;">&nbsp;</span></p>
+        <p class="card-meta" id="meta-prod-split" style="font-size:11px;line-height:1.7;">
+          <span class="tag-orange">Production impact</span>
+        </p></div>
+    <div class="kpi-card on-target"><p class="card-label">Closed Bugs</p><p class="card-value dark" id="val-closed"><span class="skel" style="width:60px;height:28px;">&nbsp;</span></p><p class="card-meta" id="meta-closed"></p></div>
+  </div>
+
+  <!-- Overall Status -->
+  <div class="status-panel">
+    <p class="panel-title">Overall Status &mdash; May 2026</p>
+    <div class="status-grid">
+      <div class="stat-box green-bg"><div class="stat-num green" id="stat-ontarget">—</div><div class="stat-desc">Metrics On Target</div></div>
+      <div class="stat-box orange-bg"><div class="stat-num orange" id="stat-attention">—</div><div class="stat-desc">Need Attention</div></div>
+      <div class="stat-box red-bg"><div class="stat-num red" id="stat-critical">—</div><div class="stat-desc">Critical</div></div>
+      <div class="stat-box dark-bg"><div class="stat-num white" id="stat-score">— / 100</div><div class="stat-desc white">Overall Benchmark Score</div></div>
+    </div>
+  </div>
+
+  <!-- Ticker -->
+  <div class="ticker">
+    <p class="bold" id="ticker-main">&#9641; Loading production bugs data…</p>
+    <p id="ticker-sub" style="opacity:.8;"></p>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="charts-section">
+    <p class="charts-title">&#128202; Data Analysis</p>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-card-title">Bugs per Product</div>
+        <div class="chart-loading" id="chart1-loading">Loading...</div>
+        <canvas id="chart-bugs-product" style="display:none;max-height:220px;"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">Bugs Per Team</div>
+        <div class="chart-loading" id="chart2-loading">Loading...</div>
+        <canvas id="chart-rootcause" style="display:none;max-height:220px;"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">Top Products Test Cases</div>
+        <div class="chart-loading" id="chart3-loading">Loading...</div>
+        <canvas id="chart-tc-product" style="display:none;max-height:220px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pie Charts -->
+  <div class="charts-grid-2">
+    <div class="chart-card-pie">
+      <div class="chart-card-title">Bugs by Severity</div>
+      <div class="chart-loading" id="chart-severity-loading">Loading...</div>
+      <canvas id="chart-severity" style="display:none;max-height:260px;max-width:320px;"></canvas>
+    </div>
+    <div class="chart-card-pie">
+      <div class="chart-card-title">Bugs by State</div>
+      <div class="chart-loading" id="chart-state-loading">Loading...</div>
+      <canvas id="chart-state" style="display:none;max-height:260px;max-width:320px;"></canvas>
+    </div>
+  </div>
+
+  <!-- Formula Section -->
+  <div class="formula-panel">
+    <p class="formula-panel-title">📐 KPI Formula Breakdown</p>
+    <div class="formula-grid">
+      <div class="f-card">
+        <div class="f-card-title">① Defect Leakage Rate</div>
+        <div style="display:flex;flex-direction:column;align-items:center;margin:8px 0;">
+          <div class="f-num" id="ff-reopen">—</div>
+          <div style="font-size:9px;color:#888;margin-bottom:2px;">Prod Bugs</div>
+          <div class="f-den" id="ff-total1">—</div>
+          <div style="font-size:9px;color:#888;">Total Bugs</div>
+        </div>
+        <div style="font-size:11px;color:#888;">× 100</div>
+        <div class="f-result green" id="ff-defect-result">—</div>
+      </div>
+      <div class="f-card">
+        <div class="f-card-title">② Reopen Rate</div>
+        <div style="display:flex;flex-direction:column;align-items:center;margin:8px 0;">
+          <div class="f-num" id="ff-reopen2">—</div>
+          <div style="font-size:9px;color:#888;margin-bottom:2px;">Reopened</div>
+          <div class="f-den" id="ff-total2">—</div>
+          <div style="font-size:9px;color:#888;">Closed Bugs</div>
+        </div>
+        <div style="font-size:11px;color:#888;">× 100</div>
+        <div class="f-result green" id="ff-reopen-result">—</div>
+      </div>
+      <div class="f-card">
+        <div class="f-card-title">③ Critical/High Rate</div>
+        <div style="display:flex;flex-direction:column;align-items:center;margin:8px 0;">
+          <div class="f-num" id="ff-crithigh">—</div>
+          <div class="f-den" id="ff-total3">—</div>
+        </div>
+        <div style="font-size:11px;color:#888;">× 100</div>
+        <div class="f-result orange" id="ff-critical-result">—</div>
+      </div>
+      <div class="f-card">
+        <div class="f-card-title">④ Resolution Rate</div>
+        <div style="display:flex;flex-direction:column;align-items:center;margin:8px 0;">
+          <div class="f-num" id="ff-closed">—</div>
+          <div class="f-den" id="ff-total4">—</div>
+        </div>
+        <div style="font-size:11px;color:#888;">× 100</div>
+        <div class="f-result blue" id="ff-res-result">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Score Detail Table -->
+  <div class="score-detail-panel">
+    <p class="score-detail-title">📊 Quality Score — Step by Step Breakdown</p>
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Actual Value</th>
+          <th>Target</th>
+          <th>Status</th>
+          <th>Formula</th>
+          <th>Weight</th>
+          <th>Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Defect Leakage</td>
+          <td id="dt-defect-val">—</td>
+          <td>≤ 5%</td>
+          <td id="dt-defect-st">—</td>
+          <td id="dt-defect-eq" style="font-family:monospace;font-size:11px;color:#1565C0;">—</td>
+          <td><span class="w-badge">25%</span></td>
+          <td id="dt-defect-pts" style="font-weight:700;color:#0F6E56;">—</td>
+        </tr>
+        <tr>
+          <td>Reopen Rate</td>
+          <td id="dt-reopen-val">—</td>
+          <td>≤ 5%</td>
+          <td id="dt-reopen-st">—</td>
+          <td id="dt-reopen-eq" style="font-family:monospace;font-size:11px;color:#1565C0;">—</td>
+          <td><span class="w-badge">20%</span></td>
+          <td id="dt-reopen-pts" style="font-weight:700;color:#0F6E56;">—</td>
+        </tr>
+        <tr>
+          <td>Critical/High Rate</td>
+          <td id="dt-critical-val">—</td>
+          <td>≤ 20%</td>
+          <td id="dt-critical-st">—</td>
+          <td id="dt-critical-eq" style="font-family:monospace;font-size:11px;color:#1565C0;">—</td>
+          <td><span class="w-badge">30%</span></td>
+          <td id="dt-critical-pts" style="font-weight:700;color:#0F6E56;">—</td>
+        </tr>
+        <tr>
+          <td>Resolution Rate</td>
+          <td id="dt-res-val">—</td>
+          <td>≥ 80%</td>
+          <td id="dt-res-st">—</td>
+          <td id="dt-res-eq" style="font-family:monospace;font-size:11px;color:#1565C0;">—</td>
+          <td><span class="w-badge">25%</span></td>
+          <td id="dt-res-pts" style="font-weight:700;color:#E07B00;">—</td>
+        </tr>
+        <tr class="total-row">
+          <td colspan="4" style="text-align:right;">✅ &nbsp;Total = Quality Score</td>
+          <td id="dt-sum-eq" style="font-family:monospace;font-size:11px;">—</td>
+          <td><span class="w-badge">100%</span></td>
+          <td id="dt-total" style="font-size:16px;color:#0F6E56;">— / 100</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="last-updated" id="lastUpdated"></p>
+</div>
+
+<script>
+// Fix Issues (Uncovered Scenario) count per month — from CSV analysis
+const FIX_ISSUES = {
+  mar2026: 3,
+  apr2026: 19,
+  may2026: 1
+};
+
+const MONTHS = {
+  mar2026: {
+    label: "March 2026",
+    title: "March 2026",
+    queries: {
+      totalBugs:        "a42ca599-577a-42e0-9d44-57bbbe150152",
+      closedBugs:       "4c68092c-1bfb-44da-9117-aa8004fc6581",
+      criticalHighBugs: "35b9f63f-bc55-4f95-ae36-d3d89807920b",
+      reopenBugs:       "25771a76-f3d6-409f-9cc8-e06b5158cbcc",
+      rejectedBugs:     "9eb3403a-d8e3-4aff-9458-9b3a800c7779",
+      testCases:        "306009f4-7c0d-4d5a-a847-eec0c66e0678",
+      changeRequests:   "71b3c43c-6b7e-4426-8061-48a6e3906b26",
+      productionBugs:   "87525bc3-8403-44a2-8e16-910c3dd56020"
+    }
+  },
+  apr2026: {
+    label: "April 2026",
+    title: "April 2026",
+    queries: {
+      totalBugs:        "c27eeefb-abc0-4f07-a296-f47678df52b1",
+      closedBugs:       "c5cb39f3-12e9-4f06-8379-0374b5604e94",
+      criticalHighBugs: "4e2b442e-5d39-4ed4-9301-e059da54fdc5",
+      reopenBugs:       "b0e2e934-db9c-4890-b9c6-2d737c8e1b6b",
+      rejectedBugs:     "8a370caa-92c0-421b-b824-03d18624d02f",
+      testCases:        "48cff1a7-f0d0-4513-9b7a-893abfcdbe2f",
+      changeRequests:   "4bdc9214-60ec-4d6e-a291-1f1a2b819fb2",
+      productionBugs:   "82872dd5-a0b6-4982-8fb8-ebba0c516ee8"
+    }
+  },
+  may2026: {
+    label: "May 2026",
+    title: "May 2026",
+    queries: {
+      totalBugs:        "03c06065-206c-43b3-a44e-fa9039b41f80",
+      closedBugs:       "c7ade10e-a366-44e7-a968-ced7fd22b192",
+      criticalHighBugs: "fae126f8-3aa2-4d4b-bd96-019aed0d9293",
+      reopenBugs:       "9064bd39-96d4-4f87-9eae-f7e1ddbe59f4",
+      rejectedBugs:     "a8d24faa-a227-4b5f-bac4-f49a64518112",
+      testCases:        "2a07021d-a898-4da5-a451-a8cd171e40cc",
+      changeRequests:   "5931baab-5279-4abb-aa25-bce71b80b046",
+      productionBugs:   "f54df5b0-1790-4e24-a4f4-a92a8fccf35c"
+    }
+  }
+}
+
+const CONFIG = {
+  tfsUrl:   "https://tfs.momra.gov.sa/tfs/BaladyCollection",
+  project:  "ConstructionLicenses",
+  pat:      "xfhnozflitywmm2g4eazjyrb6o7ytqhezq5aupxdhwq6me6jibmq",
+  queries:  Object.assign({}, MONTHS.may2026.queries),
+  targets:  { defectLeakage: 5, reopenRate: 5, rejectedBugRate: 5, criticalHighRate: 20 },
+  refreshMinutes: 5
+};
+
+;
+
+function toggleDropdown() {
+  var btn  = document.getElementById('monthDropdownBtn');
+  var list = document.getElementById('monthDropdownList');
+  btn.classList.toggle('open');
+  list.classList.toggle('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  var wrap = document.querySelector('.month-dropdown-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('monthDropdownBtn').classList.remove('open');
+    document.getElementById('monthDropdownList').classList.remove('open');
+  }
+});
+
+var selectedMonths = ['may2026'];
+var currentMonth   = 'may2026';
+
+// Initialize checkboxes after page loads
+window.addEventListener('load', function() {
+  syncCheckboxes();
+});
+
+function syncCheckboxes() {
+  ['mar2026','apr2026','may2026'].forEach(function(m) {
+    var chk  = document.getElementById('chk-' + m);
+    var item = document.getElementById('item-' + m);
+    if (!chk || !item) return;
+    var sel = selectedMonths.indexOf(m) !== -1;
+    chk.checked = sel;
+    if (sel) item.classList.add('selected');
+    else     item.classList.remove('selected');
+  });
+  updateDropdownBtn();
+}
+
+function updateDropdownBtn() {
+  var labels = selectedMonths.map(function(m){
+    var map = { mar2026:'March 2026', apr2026:'April 2026', may2026:'May 2026' };
+    return map[m] || m;
+  });
+  var btnText = document.getElementById('monthBtnText');
+  var btnCount = document.getElementById('monthBtnCount');
+  var badge = document.getElementById('monthBadge');
+  var h1 = document.querySelector('h1');
+  var panel = document.querySelector('.panel-title');
+
+  if (selectedMonths.length === 1) {
+    if (btnText)  btnText.textContent  = labels[0];
+    if (btnCount) btnCount.textContent = '1';
+    if (badge)    badge.textContent    = labels[0];
+    if (h1)    h1.textContent    = '4 Key Performance Indicators · ' + (MONTHS[selectedMonths[0]] ? MONTHS[selectedMonths[0]].title : '');
+    if (panel) panel.textContent = 'Overall Status — ' + (MONTHS[selectedMonths[0]] ? MONTHS[selectedMonths[0]].title : '');
+  } else {
+    var short = labels.map(function(l){ return l.split(' ')[0]; }).join(', ');
+    if (btnText)  btnText.textContent  = short;
+    if (btnCount) btnCount.textContent = String(selectedMonths.length);
+    if (badge)    badge.textContent    = labels.join(' + ');
+    if (h1)    h1.textContent    = '4 Key Performance Indicators · Combined (' + selectedMonths.length + ' months)';
+    if (panel) panel.textContent = 'Overall Status — Combined (' + selectedMonths.length + ' months)';
+  }
+}
+
+function toggleMonthItem(monthKey, event) {
+  event.stopPropagation();
+  var chk  = document.getElementById('chk-' + monthKey);
+  var item = document.getElementById('item-' + monthKey);
+  var isSelected = selectedMonths.indexOf(monthKey) !== -1;
+
+  // Must keep at least 1 selected
+  if (isSelected && selectedMonths.length === 1) return;
+
+  if (isSelected) {
+    selectedMonths = selectedMonths.filter(function(m){ return m !== monthKey; });
+    chk.checked = false;
+    item.classList.remove('selected');
+  } else {
+    selectedMonths.push(monthKey);
+    chk.checked = true;
+    item.classList.add('selected');
+  }
+
+  // Sort chronologically
+  var order = ['mar2026','apr2026','may2026'];
+  selectedMonths.sort(function(a,b){ return order.indexOf(a)-order.indexOf(b); });
+
+  if (selectedMonths.length === 1) {
+    currentMonth = selectedMonths[0];
+    CONFIG.queries = Object.assign({}, MONTHS[selectedMonths[0]].queries);
+  }
+
+  updateDropdownBtn();
+  loadDashboard();
+  loadCharts();
+}
+
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('en-US');
+
+function authHeader() { return "Basic " + btoa(":" + CONFIG.pat); }
+
+async function runQuery(queryId) {
+  const url = `${CONFIG.tfsUrl}/${CONFIG.project}/_apis/wit/wiql/${queryId}?api-version=3.0&$top=5000`;
+  const res = await fetch(url, { method: "GET", headers: { "Authorization": authHeader(), "Accept": "application/json" }, credentials: "omit" });
+  if (!res.ok) throw new Error(`Query ${queryId} failed: ${res.status}`);
+  const data = await res.json();
+  return (data.workItems || []).length;
+}
+
+
+function calcQuality(defectPct, reopenPct, criticalPct, resPct) {
+  // PPTX QC Benchmark formula:
+  // QS = (1-DL%)×30 + (1-C/H%)×30 + (1-RR%)×20 + Resolution%×20
+  const dPts   = (1 - defectPct/100)   * 30;
+  const cPts   = (1 - criticalPct/100) * 30;
+  const rPts   = (1 - reopenPct/100)   * 20;
+  const resPts = (resPct/100)           * 20;
+  const total  = Math.max(0, Math.min(100, dPts + cPts + rPts + resPts));
+  return { dPts, rPts, cPts, resPts, total };
+}
+
+
+function badge(ok) {
+  return ok
+    ? '<span class="badge-ok">✓ On Target</span>'
+    : '<span class="badge-warn">⚠ Needs Action</span>';
+}
+
+function statusColor(actual, target, higherIsBad) {
+  // Returns color class based on how far from target
+  var bad = higherIsBad ? actual > target : actual < target;
+  if (!bad) return 'green';
+  var ratio = higherIsBad ? actual / target : target / actual;
+  return ratio > 1.5 ? 'red' : 'orange'; // >50% off = red, else orange
+}
+
+
+function loadCharts() {
+  var CHART_DATA = {
+    mar2026: {
+      bugsLabels: ['ContractorClassification','BaladyPlus','ConstructionLicenses','CommercialLicenses','Nasseq','Gamification','BaladyBusiness','PlanApproval','HealthCertificates','EwaaAndTobacco','BaladyWebMap','MergeAndSplit','BaladyPortal','Balady.sa'],
+      bugsData:   [433, 281, 186, 125, 91, 58, 55, 32, 22, 20, 20, 11, 10, 9],
+      rcLabels:   ['Development','Mobile','Development-Balady','Business','Data','GIS','Enhancement','Infrastructure','Integration','Operation','Development-Drupal','Production Team','Integration-External','UX'],
+      rcData:     [498, 330, 245, 80, 47, 43, 34, 32, 18, 12, 11, 9, 9, 9],
+      tcLabels:   ['CommercialLicenses','BaladyBusiness'],
+      tcData:     [94, 40],
+      sevLabels:  ['1 - Critical','2 - High','3 - Medium','4 - Low'],
+      sevData:    [85, 310, 662, 325],
+      stateLabels:['Active','New','ReadyToBuild','Resolved','Closed'],
+      stateData:  [12, 23, 1, 8, 1338]
+    },
+    apr2026: {
+      bugsLabels: ['BaladyPlus','ConstructionLicenses','ContractorClassification','CommercialLicenses','Nasseq','RealEstateStimulus','Gamification','PlanApproval','BaladyBusiness','WasteManagement','Ekram','LaborHousing','HealthCertificates','Tawakkalna'],
+      bugsData:   [299, 207, 202, 119, 85, 78, 62, 40, 39, 35, 31, 28, 25, 21],
+      rcLabels:   ['Mobile','Development-Balady','Development','Business','Development-Drupal','GIS','Data','Enhancement','Infrastructure','Integration','Integration-External','Operation','Uncovered Scenario'],
+      rcData:     [317, 279, 251, 92, 90, 54, 48, 37, 34, 29, 26, 24, 19],
+      tcLabels:   ['ConstructionLicenses','RealEstateStimulus','CommercialLicenses','BaladyPlus','EwaaAndTobacco','BaladyBusiness','HealthCertificates','CraftLicense','Ekram'],
+      tcData:     [543, 478, 338, 244, 189, 157, 145, 22, 17],
+      sevLabels:  ['1 - Critical','2 - High','3 - Medium','4 - Low'],
+      sevData:    [76, 374, 749, 146],
+      stateLabels:['Active','New','ReadyToBuild','Resolved','Closed'],
+      stateData:  [21, 91, 14, 45, 1174]
+    },
+    may2026: {
+      bugsLabels: ['ContractorClassification','BaladyPlus','ConstructionLicenses','Nasseq','Ekram','CommercialLicenses','PlanApproval','HealthCertificates','Tawakkalna','BaladyBusiness','EwaaAndTobacco','BaladyPortal','LaborHousing'],
+      bugsData:   [269, 94, 54, 36, 22, 20, 14, 10, 9, 7, 7, 6, 5],
+      rcLabels:   ['Development','Development-Balady','Mobile','Data','Enhancement','Business','Production Team','Infrastructure','Integration','Development-Pega','Operation','Product Manager'],
+      rcData:     [275, 86, 79, 23, 19, 19, 12, 12, 10, 10, 7, 5],
+      tcLabels:   ['BaladyBusiness','CommercialLicenses','ContractorClassification','BaladyPlus','ConstructionLicenses','HealthCertificates','Nasseq','MergeAndSplit'],
+      tcData:     [360, 137, 117, 107, 77, 64, 28, 26],
+      sevLabels:  ['1 - Critical','2 - High','3 - Medium','4 - Low'],
+      sevData:    [17, 119, 349, 79],
+      stateLabels:['Active','New','ReadyToBuild','Resolved','Closed'],
+      stateData:  [27, 91, 16, 45, 385]
+    }
+  };
+
+  var currentMon = (typeof selectedMonths !== 'undefined' && selectedMonths.length === 1) ? selectedMonths[0] : (typeof currentMonth !== 'undefined' ? currentMonth : 'may2026');
+  var d = CHART_DATA[currentMon] || CHART_DATA.may2026;
+
+  ['chart-bugs-product','chart-rootcause','chart-tc-product','chart-severity','chart-state'].forEach(function(id) {
+    var c = document.getElementById(id);
+    if (c) { var ch = Chart.getChart(c); if (ch) ch.destroy(); c.style.display='none'; }
+  });
+  ['chart1-loading','chart2-loading','chart3-loading','chart-severity-loading','chart-state-loading'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) { el.style.display='block'; el.textContent='Loading...'; }
+  });
+
+  drawChart('chart-bugs-product','chart1-loading', d.bugsLabels, d.bugsData);
+  drawChart('chart-rootcause',   'chart2-loading', d.rcLabels,   d.rcData);
+  drawChart('chart-tc-product',  'chart3-loading', d.tcLabels,   d.tcData);
+  if (d.sevLabels) drawPieChart('chart-severity','chart-severity-loading', d.sevLabels, d.sevData, ['#C0392B','#E07B00','#1565C0','#0F6E56']);
+  if (d.stateLabels) drawPieChart('chart-state','chart-state-loading', d.stateLabels, d.stateData, ['#E07B00','#1565C0','#6A1B9A','#F57F17','#0F6E56']);
+}
+
+function drawChart(canvasId, loadingId, labels, data) {
+  var loadEl = document.getElementById(loadingId);
+  var canvas  = document.getElementById(canvasId);
+  if (!canvas || !labels || !labels.length) { if(loadEl){loadEl.style.display='block';loadEl.textContent='No data available';} return; }
+  var ex = Chart.getChart(canvas); if (ex) ex.destroy();
+  if (loadEl) loadEl.style.display='none';
+  canvas.style.display='block';
+  new Chart(canvas, {
+    type:'bar',
+    data:{ labels:labels, datasets:[{ data:data, backgroundColor:['#0F6E56','#1565C0','#E07B00','#C0392B','#6A1B9A','#00695C','#880E4F','#37474F','#F57F17','#1A237E','#004D40','#BF360C','#4A148C','#0D47A1','#1B5E20','#E65100'], borderRadius:4, borderSkipped:false }] },
+    options:{ responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:function(c){return ' '+c.parsed.y;}}} },
+      scales:{ x:{ticks:{font:{size:9},maxRotation:45,minRotation:30},grid:{display:false}}, y:{ticks:{font:{size:10}},beginAtZero:true,grid:{color:'#f0f0f0'}} }
+    }
+  });
+}
+
+function drawPieChart(canvasId, loadingId, labels, data, colors) {
+  var loadEl = document.getElementById(loadingId);
+  var canvas  = document.getElementById(canvasId);
+  if (!canvas || !labels || !labels.length) { if(loadEl){loadEl.style.display='block';loadEl.textContent='No data available';} return; }
+  var ex = Chart.getChart(canvas); if (ex) ex.destroy();
+  if (loadEl) loadEl.style.display='none';
+  canvas.style.display='block';
+  var total = data.reduce(function(a,b){return a+b;},0);
+  new Chart(canvas, {
+    type:'doughnut',
+    data:{ labels:labels, datasets:[{ data:data, backgroundColor:colors||['#0F6E56','#1565C0','#E07B00','#C0392B','#6A1B9A'], borderWidth:2, borderColor:'#fff' }] },
+    options:{ responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{display:true,position:'bottom',labels:{font:{size:10},padding:8,boxWidth:12}},
+        tooltip:{callbacks:{label:function(c){ var pct=total>0?((c.parsed/total)*100).toFixed(1):0; return ' '+c.label+': '+c.parsed+' ('+pct+'%)'; }}}
+      }
+    }
+  });
+}
+
+
+function renderDashboardData(total, closed, critHigh, reopen, rejected, tc, cr, prod, isAvg) {
+    const defectPct   = total  ? +((prod    / total)  * 100).toFixed(2) : 0;  // Production Bugs / Total Bugs
+    const reopenPct   = closed ? +((reopen  / closed) * 100).toFixed(2) : 0;  // Reopened / Closed Bugs
+    const criticalPct = total  ? +((critHigh / total) * 100).toFixed(2) : 0;  // Crit+High / Total Bugs
+    const resPct      = total  ? +((closed   / total) * 100).toFixed(1) : 0;  // Closed / Total Bugs
+    const rejectedPct  = total ? +((rejected / total) * 100).toFixed(2) : 0;
+    const q = calcQuality(defectPct, reopenPct, criticalPct, resPct);
+    const qualityScore = q.total.toFixed(1);
+
+    // ── Source line ──
+    $("sourceLine").textContent = `Source: TFS — Total Bugs: ${fmt(total)} · Closed: ${fmt(closed)} · Test Cases: ${fmt(tc)} · CRs: ${fmt(cr)}`;
+
+    // ── KPI Cards ──
+    const dClass = defectPct   <= CONFIG.targets.defectLeakage   ? "on-target" : "critical";
+    const rClass = reopenPct   <= CONFIG.targets.reopenRate       ? "on-target" : "needs-action";
+    const cClass = criticalPct <= CONFIG.targets.criticalHighRate ? "on-target" : "critical";
+
+    $("card-defect").className = `kpi-card ${dClass}`;
+    $("val-defect").className  = `card-value ${dClass === "on-target" ? "green" : "red"}`;
+    $("val-defect").textContent = defectPct + "%";
+    $("meta-defect").innerHTML  = (dClass === "on-target" ? '<span class="tag-green">✓ On Target</span>' : '<span class="tag-red">✗ Off Target</span>')
+      + `<br><span class="tag-gray">${fmt(prod)} prod ÷ ${fmt(total)} bugs</span><br><span class="tag-gray">Target: ≤ ${CONFIG.targets.defectLeakage}%</span>`;
+
+    $("card-reopen").className = `kpi-card ${rClass}`;
+    $("val-reopen").className  = `card-value ${rClass === "on-target" ? "green" : "orange"}`;
+    $("val-reopen").textContent = reopenPct + "%";
+        $("meta-reopen").innerHTML  = (rClass === "on-target" ? '<span class="tag-green">✓ On Target</span>' : '<span class="tag-orange">⚠ Needs Action</span>')
+      + `<br><span class="tag-gray">${fmt(reopen)} reopened ÷ ${fmt(closed)} closed</span><br><span class="tag-gray">Target: ≤ ${CONFIG.targets.reopenRate}%</span>`;
+
+    const rejClass = rejectedPct <= CONFIG.targets.rejectedBugRate ? "on-target" : "critical";
+    $("card-rejected").className  = "kpi-card " + rejClass;
+    $("val-rejected").className   = "card-value " + (rejClass === "on-target" ? "green" : "red");
+    $("val-rejected").textContent = rejectedPct + "%";
+        $("meta-rejected").innerHTML  = (rejClass === "on-target" ? '<span class="tag-green">✓ On Target</span>' : '<span class="tag-red">✗ Off Target</span>')
+      + `<br><span class="tag-gray">${fmt(rejected)} removed ÷ ${fmt(total)} bugs</span><br><span class="tag-gray">Target: ≤ ${CONFIG.targets.rejectedBugRate}%</span>`;
+
+    $("card-critical").className = `kpi-card ${cClass}`;
+    $("val-critical").className  = `card-value ${cClass === "on-target" ? "green" : "red"}`;
+    $("val-critical").textContent = criticalPct + "%";
+        $("meta-critical").innerHTML  = (cClass === "on-target" ? '<span class="tag-green">✓ On Target</span>' : '<span class="tag-red">✗ Off Target</span>')
+      + `<br><span class="tag-gray">${fmt(critHigh)} crit/high ÷ ${fmt(total)} bugs</span><br><span class="tag-gray">Target: ≤ ${CONFIG.targets.criticalHighRate}%</span>`;
+
+    $("val-quality").textContent = qualityScore + "/100";
+        $("meta-quality").innerHTML  = `<span class="tag-gray">${q.dPts.toFixed(1)} + ${q.cPts.toFixed(1)} + ${q.rPts.toFixed(1)} + ${q.resPts.toFixed(1)}</span>`;
+
+    // ── Row 2 ──
+    $("val-total").textContent  = fmt(total);
+    $("meta-total").innerHTML   = `<span class="tag-green">Bugs this sprint</span>`;
+    $("val-tc").textContent     = fmt(tc);
+    $("val-cr").textContent     = fmt(cr);
+    $("val-prod").textContent   = fmt(prod);
+
+    // Split Production Bugs: Technical Impact vs Fix Issues (Uncovered Scenario)
+    var fixIssues = 0;
+    var activeMths = (typeof selectedMonths !== 'undefined') ? selectedMonths : [typeof currentMonth !== 'undefined' ? currentMonth : 'may2026'];
+    activeMths.forEach(function(m) { fixIssues += (FIX_ISSUES[m] || 0); });
+    var techImpact = Math.max(0, prod - fixIssues);
+    var splitEl = $("meta-prod-split");
+    if (splitEl) {
+      splitEl.innerHTML = '<span class="tag-orange">Production impact</span>'
+        + '<br><span style="color:#C0392B;font-weight:600;font-size:11.5px;">🔴 Technical Impact: <b>' + fmt(techImpact) + '</b></span>'
+        + '<br><span style="color:#E07B00;font-weight:600;font-size:11.5px;">🟡 Fix Issues: <b>' + fmt(fixIssues) + '</b></span>';
+    }
+    $("val-closed").textContent = fmt(closed);
+        $("meta-closed").innerHTML  = `<span class="tag-green">Resolution Rate ${resPct}%</span><br><span class="tag-gray">${fmt(closed)} closed ÷ ${fmt(total)} bugs</span>`;
+
+    // ── Overall Status ──
+    let onTarget = 0, attention = 0, critical = 0;
+    [{v:defectPct,t:CONFIG.targets.defectLeakage,hi:true},{v:reopenPct,t:CONFIG.targets.reopenRate,hi:true},{v:criticalPct,t:CONFIG.targets.criticalHighRate,hi:true},{v:resPct,t:80,hi:false}]
+      .forEach(({v,t,hi}) => { const bad = hi ? v>t : v<t; if(!bad) onTarget++; else if(hi ? v<=t*1.3 : v>=t*0.8) attention++; else critical++; });
+
+    $("stat-ontarget").textContent  = onTarget;
+    $("stat-attention").textContent = attention;
+    $("stat-critical").textContent  = critical;
+    $("stat-score").textContent     = qualityScore + " / 100";
+
+    // ── Ticker ──
+    $("ticker-main").innerHTML  = `&#9641; Production Bugs — ${fmt(prod)} &nbsp;|&nbsp; Total: ${fmt(total)} &nbsp;|&nbsp; Closed: ${fmt(closed)} &nbsp;|&nbsp; CRs: ${fmt(cr)} &nbsp;|&nbsp; Test Cases: ${fmt(tc)}`;
+    $("ticker-sub").textContent = `Critical/High: ${fmt(critHigh)} (${criticalPct}%) · Reopen: ${fmt(reopen)} · Resolution Rate: ${resPct}%`;
+
+    // ── Formula Cards ──
+    $("ff-reopen").textContent   = fmt(prod);      // Defect Leakage = Production Bugs
+    $("ff-total1").textContent   = fmt(total);
+    $("ff-reopen2").textContent  = fmt(reopen);    // Reopen Rate = Reopened / Closed
+    $("ff-total2").textContent   = fmt(closed);
+    $("ff-crithigh").textContent = fmt(critHigh);
+    $("ff-total3").textContent   = fmt(total);
+    $("ff-closed").textContent   = fmt(closed);
+    $("ff-total4").textContent   = fmt(total);
+
+    $("ff-defect-result").innerHTML  = `<b>${defectPct}%</b> &nbsp; ${dClass==="on-target"?"✓":"✗"} Target ≤ ${CONFIG.targets.defectLeakage}%`;
+    $("ff-defect-result").style.color = dClass==="on-target" ? "#0F6E56" : "#C0392B";
+    $("ff-reopen-result").innerHTML  = `<b>${reopenPct}%</b> &nbsp; ${rClass==="on-target"?"✓":"⚠"} Target ≤ ${CONFIG.targets.reopenRate}%`;
+    $("ff-reopen-result").style.color = rClass==="on-target" ? "#0F6E56" : "#E07B00";
+    $("ff-critical-result").innerHTML = `<b>${criticalPct}%</b> &nbsp; ${cClass==="on-target"?"✓":"✗"} Target ≤ ${CONFIG.targets.criticalHighRate}%`;
+    $("ff-critical-result").style.color = cClass==="on-target" ? "#0F6E56" : "#C0392B";
+    $("ff-res-result").innerHTML     = `<b>${resPct}%</b> &nbsp; ${resPct>=80?"✓":"⚠"} Target ≥ 80%`;
+    $("ff-res-result").style.color   = resPct >= 80 ? "#0F6E56" : "#E07B00";
+
+    // ── Score Detail Table ──
+    // Color values in detail table based on status
+    function applyColor(elId, text, color) {
+      var el = $(elId);
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = color === 'green' ? '#0F6E56' : color === 'orange' ? '#E07B00' : '#C0392B';
+      el.style.fontWeight = '700';
+    }
+    applyColor('dt-defect-val',   defectPct   + '%', dColor);
+    applyColor('dt-reopen-val',   reopenPct   + '%', rColor);
+    applyColor('dt-critical-val', criticalPct + '%', cColor);
+    applyColor('dt-res-val',      resPct      + '%', resColor);
+
+    function colorBadge(actual, target, higherIsBad) {
+      var bad = higherIsBad ? actual > target : actual < target;
+      if (!bad) return '<span class="badge-ok">✓ On Target</span>';
+      var ratio = higherIsBad ? actual/target : target/actual;
+      if (ratio > 1.5) return '<span class="badge-red">✗ Off Target</span>';
+      return '<span class="badge-warn">⚠ Needs Action</span>';
+    }
+
+    $("dt-defect-st").innerHTML   = colorBadge(defectPct,   CONFIG.targets.defectLeakage,   true);
+    $("dt-reopen-st").innerHTML   = colorBadge(reopenPct,   CONFIG.targets.reopenRate,       true);
+    $("dt-critical-st").innerHTML = colorBadge(criticalPct, CONFIG.targets.criticalHighRate, true);
+    $("dt-res-st").innerHTML      = colorBadge(resPct,      80,                              false);
+
+    $("dt-defect-eq").textContent   = `(1 - ${defectPct}%) × 30`;
+    $("dt-reopen-eq").textContent   = `(1 - ${reopenPct}%) × 20`;
+    $("dt-critical-eq").textContent = `(1 - ${criticalPct}%) × 30`;
+    $("dt-res-eq").textContent      = `${resPct}% × 20`;
+
+    // Color points based on KPI status
+    var dColor   = statusColor(defectPct,   CONFIG.targets.defectLeakage,   true);
+    var rColor   = statusColor(reopenPct,   CONFIG.targets.reopenRate,       true);
+    var cColor   = statusColor(criticalPct, CONFIG.targets.criticalHighRate, true);
+    var resColor = statusColor(resPct,      80,                              false);
+
+    function colorPts(elId, val, color) {
+      var el = $(elId);
+      el.textContent = val;
+      el.style.color = color === 'green' ? '#0F6E56' : color === 'orange' ? '#E07B00' : '#C0392B';
+      el.style.fontWeight = '700';
+    }
+
+    colorPts('dt-defect-pts',   q.dPts.toFixed(2),   dColor);
+    colorPts('dt-reopen-pts',   q.rPts.toFixed(2),   rColor);
+    colorPts('dt-critical-pts', q.cPts.toFixed(2),   cColor);
+    colorPts('dt-res-pts',      q.resPts.toFixed(2), resColor);
+
+    $("dt-sum-eq").textContent = `${q.dPts.toFixed(2)} + ${q.rPts.toFixed(2)} + ${q.cPts.toFixed(2)} + ${q.resPts.toFixed(2)}`;
+    var totalEl = $("dt-total");
+    if (totalEl) {
+      totalEl.textContent = qualityScore + " / 100";
+      totalEl.style.color = parseFloat(qualityScore) >= 80 ? '#0F6E56' : parseFloat(qualityScore) >= 70 ? '#E07B00' : '#C0392B';
+    }
+
+    $("lastUpdated").textContent = "Last updated: " + new Date().toLocaleString('en-GB');
+}
+
+async function loadDashboardMulti() {
+  $("loadingBar").style.display = "flex";
+  $("errorBar").style.display   = "none";
+  try {
+    var results = await Promise.all(selectedMonths.map(function(m) {
+      var q = MONTHS[m].queries;
+      return Promise.all([
+        runQuery(q.totalBugs), runQuery(q.closedBugs), runQuery(q.criticalHighBugs),
+        runQuery(q.reopenBugs), runQuery(q.rejectedBugs), runQuery(q.testCases),
+        runQuery(q.changeRequests), runQuery(q.productionBugs)
+      ]);
+    }));
+    // SUM absolute values
+    var total    = results.reduce(function(s,r){return s+r[0];},0);
+    var closed   = results.reduce(function(s,r){return s+r[1];},0);
+    var critHigh = results.reduce(function(s,r){return s+r[2];},0);
+    var reopen   = results.reduce(function(s,r){return s+r[3];},0);
+    var rejected = results.reduce(function(s,r){return s+r[4];},0);
+    var tc       = results.reduce(function(s,r){return s+r[5];},0);
+    var cr       = results.reduce(function(s,r){return s+r[6];},0);
+    var prod     = results.reduce(function(s,r){return s+r[7];},0);
+    renderDashboardData(total, closed, critHigh, reopen, rejected, tc, cr, prod, true);
+    $("loadingBar").style.display = "none";
+  } catch(err) {
+    $("loadingBar").style.display = "none";
+    $("errorBar").style.display   = "flex";
+    $("errorMsg").textContent     = err.message;
+  }
+}
+
+
+async function loadDashboard() {
+  // Multi-month: fetch all selected months and sum/avg
+  if (selectedMonths.length > 1) {
+    await loadDashboardMulti();
+    return;
+  }
+  // Single month
+  CONFIG.queries = Object.assign({}, MONTHS[selectedMonths[0]].queries);
+  $("loadingBar").style.display = "flex";
+  $("errorBar").style.display   = "none";
+
+  try {
+    const [total, closed, critHigh, reopen, rejected, tc, cr, prod] = await Promise.all([
+      runQuery(CONFIG.queries.totalBugs),
+      runQuery(CONFIG.queries.closedBugs),
+      runQuery(CONFIG.queries.criticalHighBugs),
+      runQuery(CONFIG.queries.reopenBugs),
+      runQuery(CONFIG.queries.rejectedBugs),
+      runQuery(CONFIG.queries.testCases),
+      runQuery(CONFIG.queries.changeRequests),
+      runQuery(CONFIG.queries.productionBugs)
+    ]);
+
+    renderDashboardData(total, closed, critHigh, reopen, rejected, tc, cr, prod, false);
+    $("loadingBar").style.display = "none";
+
+  } catch (err) {
+    $("loadingBar").style.display = "none";
+    $("errorBar").style.display   = "flex";
+    $("errorMsg").textContent     = err.message;
+    console.error("TFS Error:", err);
+  }
+}
+
+loadDashboard();
+setInterval(loadDashboard, CONFIG.refreshMinutes * 60 * 1000);
+loadCharts();
+syncCheckboxes();
+</script>
+</body>
+</html>
